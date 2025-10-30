@@ -1028,7 +1028,8 @@ func main() {
 		fmt.Println("3. Incidencias")
 		fmt.Println("4. Mecánicos")
 		fmt.Println("5. Plazas y estado del taller")
-		fmt.Println("6. Limpiar pantalla") 
+		fmt.Println("6. Limpiar pantalla")
+		fmt.Println("7. Simulación concurrente (goroutines)")
 		fmt.Println("0. Salir")
 		fmt.Print("Seleccione una opción: ")
 
@@ -1048,6 +1049,8 @@ func main() {
 			menuPlazas(t)
 		case 6:
 			clearScreen()
+		case 7:
+			SimularTaller(t)
 		case 0:
 			fmt.Println("Saliendo del sistema...")
 			return
