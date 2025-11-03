@@ -35,6 +35,7 @@ type Incidencia struct {
 	Prioridad   string
 	Descripcion string
 	Estado      int // 0 abierta, 1 en proceso, 2 cerrada
+	TiempoAcumulado int // nuevo: tiempo total que lleva siendo atendida
 }
 
 type Mecanico struct {
@@ -403,6 +404,7 @@ func printIncidencia(i *Incidencia) {
 	fmt.Printf("Tipo: %s\n", i.Tipo)
 	fmt.Printf("Prioridad: %s\n", i.Prioridad)
 	fmt.Printf("Descripción: %s\n", i.Descripcion)
+	fmt.Printf("Tiempo acumulado: %d s\n", i.TiempoAcumulado)
 
 	estadoStr := ""
 	switch i.Estado {
@@ -1050,7 +1052,7 @@ func main() {
 		case 6:
 			clearScreen()
 		case 7:
-			SimularTaller(t)
+			simularTaller(t)
 		case 0:
 			fmt.Println("Saliendo del sistema...")
 			return
