@@ -9,6 +9,16 @@ import (
 	"strings"
 )
 
+// ------------ TIPOS ENUMERADOS ------------
+
+type Especialidad string
+
+const (
+	Mecanica   Especialidad = "mecanica"
+	Electrica  Especialidad = "electrica"
+	Carroceria Especialidad = "carroceria"
+)
+
 // ------------ DEFINICIÓN DE LAS ESTRUCTURAS ------------
 
 type Cliente struct {
@@ -31,7 +41,7 @@ type Vehiculo struct {
 type Incidencia struct {
 	ID          int
 	Mecanicos   []*Mecanico
-	Tipo        string
+	Tipo        Especialidad
 	Prioridad   string
 	Descripcion string
 	Estado      int // 0 abierta, 1 en proceso, 2 cerrada
@@ -41,7 +51,7 @@ type Incidencia struct {
 type Mecanico struct {
 	ID           int
 	Nombre       string
-	Especialidad string
+	Especialidad Especialidad // nuevo: tipo enumerado
 	AñosExp      int
 	Activo       bool
 }
@@ -59,7 +69,7 @@ type Taller struct {
 	Mecanicos        []*Mecanico
 	Incidencias      []*Incidencia
 	Plazas           []*Plaza
-	nextClienteID    int // para que sea incremental y no al azar. Inicio en 1
+	nextClienteID    int // para que sea incremental y no al azar.
 	nextIncidenciaID int
 	nextMecanicoID   int
 }
@@ -93,15 +103,22 @@ func (t *Taller) newVehiculo(mat string, mar string, mod string, fentrada string
 }
 
 func (t *Taller) newIncidencia(mat string, mecs []*Mecanico, tip string, p string, d string) (*Incidencia, error) {
+	esp := Especialidad(strings.ToLower(tip))
+	
+	if esp != Mecanica && esp != Electrica && esp != Carroceria {
+		return nil, fmt.Errorf("tipo de incidencia inválido (%s)", tip)
+	}
+	
 	v := t.getVehiculo(mat)
 
 	if v == nil {
 		return nil, fmt.Errorf("vehículo con matrícula %s no encontrado", mat)
 	}
+	
 	inc := &Incidencia{
 		ID:          t.nextIncidenciaID,
 		Mecanicos:   mecs,
-		Tipo:        tip,
+		Tipo:        esp,
 		Prioridad:   p,
 		Descripcion: d,
 		Estado:      0,
@@ -114,10 +131,17 @@ func (t *Taller) newIncidencia(mat string, mecs []*Mecanico, tip string, p strin
 }
 
 func (t *Taller) newMecanico(n string, e string, a int) *Mecanico {
+	esp := Especialidad(strings.ToLower(e))
+
+	if esp != Mecanica && esp != Electrica && esp != Carroceria {
+		fmt.Printf("Especialidad inválida (%s). Debe ser 'mecanica', 'electrica' o 'carroceria'.\n", e)
+		return nil
+	}
+	
 	m := &Mecanico{
 		ID:           t.nextMecanicoID,
 		Nombre:       n,
-		Especialidad: e,
+		Especialidad: esp,
 		AñosExp:      a,
 		Activo:       true,
 	}
@@ -223,8 +247,13 @@ func (t *Taller) updateMecanico(id int, nombre, especialidad string, a int, acti
 		m.Nombre = nombre
 	}
 	if especialidad != "" {
-		m.Especialidad = especialidad
+		esp := Especialidad(strings.ToLower(especialidad))
+		if esp != Mecanica && esp != Electrica && esp != Carroceria {
+			return fmt.Errorf("especialidad inválida (%s): debe ser 'mecanica', 'electrica' o 'carroceria'", especialidad)
+		}
+		m.Especialidad = esp
 	}
+
 	if a != 0 {
 		m.AñosExp = a
 	}
@@ -253,7 +282,11 @@ func (t *Taller) updateIncidencia(id int, tipo, prioridad, desc string, estado i
 		return fmt.Errorf("incidencia con ID %d no encontrada", id)
 	}
 	if tipo != "" {
-		inc.Tipo = tipo
+		esp := Especialidad(strings.ToLower(tipo))
+		if esp != Mecanica && esp != Electrica && esp != Carroceria {
+			return fmt.Errorf("tipo de incidencia inválido (%s)", tipo)
+		}
+		inc.Tipo = esp
 	}
 	if prioridad != "" {
 		inc.Prioridad = prioridad
@@ -468,7 +501,7 @@ func printMecanico(m *Mecanico) {
 
 	fmt.Printf("ID: %d\n", m.ID)
 	fmt.Printf("Nombre: %s\n", m.Nombre)
-	fmt.Printf("Especialidad: %s\n", m.Especialidad)
+	fmt.Printf("Especialidad: %s\n", string(m.Especialidad))
 	fmt.Printf("Años de experiencia: %d\n", m.AñosExp)
 	fmt.Printf("Activo: %t\n", m.Activo)
 }
@@ -929,7 +962,7 @@ func menuMecanicos(t *Taller) {
 			var exp int
 			fmt.Print("Nombre: ")
 			fmt.Scanln(&nombre)
-			fmt.Print("Especialidad: ")
+			fmt.Print("Especialidad (mecanica / electrica / carroceria): ")
 			fmt.Scanln(&esp)
 			fmt.Print("Años de experiencia: ")
 			fmt.Scanln(&exp)
@@ -952,7 +985,7 @@ func menuMecanicos(t *Taller) {
 			fmt.Scanln(&id)
 			fmt.Print("Nuevo nombre: ")
 			fmt.Scanln(&nombre)
-			fmt.Print("Nueva especialidad: ")
+			fmt.Print("Nueva especialidad (mecanica / electrica / carroceria): ")
 			fmt.Scanln(&esp)
 			fmt.Print("Años experiencia: ")
 			fmt.Scanln(&exp)
