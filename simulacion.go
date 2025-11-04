@@ -28,13 +28,13 @@ func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan str
 		// Simulación según la especialidad
 		var duracion int
 		switch m.Especialidad {
-		case "mecanica":
+		case Mecanica:
 			duracion = 5
-		case "electrica":
+		case Electrica:
 			duracion = 7
-		case "carroceria":
+		case Carroceria:
 			duracion = 11
-		default: // para que no falle pongo un default
+		default:
 			duracion = 5
 		}
 
@@ -56,13 +56,13 @@ func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan str
 			mecLibre := buscarMecanicoLibre(t, m.Especialidad)
 			if mecLibre == nil {
 				// Si no hay mecánicos disponibles, se contrata uno nuevo
-				mecLibre = t.newMecanico(fmt.Sprintf("Auto-%s", m.Especialidad), m.Especialidad, 1)
+				mecLibre = t.newMecanico(fmt.Sprintf("Auto-%s", m.Especialidad), string(m.Especialidad), 1)
 				msg2 := fmt.Sprintf("Contratado nuevo mecánico: %s (%s)", mecLibre.Nombre, mecLibre.Especialidad)
 				chResultados <- msg2
 			}
 
 			// Reasignar el vehículo
-			go reasignarTrabajo(chTrabajos, v, inc)
+			reasignarTrabajo(chTrabajos, v, inc)
 		} else {
 			inc.Estado = 2 // Cerrada
 			msg := fmt.Sprintf("Mecánico %s terminó vehículo %s (%s) en %ds",
@@ -73,7 +73,7 @@ func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan str
 }
 
 // auxiliar para buscar un mecánico libre
-func buscarMecanicoLibre(t *Taller, especialidad string) *Mecanico {
+func buscarMecanicoLibre(t *Taller, especialidad Especialidad) *Mecanico {
 	for _, m := range t.Mecanicos {
 		if m.Activo && m.Especialidad == especialidad {
 			return m
@@ -84,7 +84,7 @@ func buscarMecanicoLibre(t *Taller, especialidad string) *Mecanico {
 
 // Goroutine generadora
 func generadorVehículos(t *Taller, chTrabajos chan Trabajo) {
-	tipos := []string{"mecanica", "electrica", "carroceria"}
+	tipos := []Especialidad{Mecanica, Electrica, Carroceria}
 
 	for i := 1; i <= 10; i++ {
 		tipo := tipos[i%3]
