@@ -10,6 +10,11 @@ Como hay varios archivos fuente, necesito inicializar el módulo Go
 paula@840g3:~/SSDD/practica2SSDD$ go mod init practica2SSDD
 paula@840g3:~/SSDD/practica2SSDD$ go run .
 ```
+Para ejecutar los test:
+
+```
+paula@840g3:~/SSDD/practica2SSDD$ go test -v
+```
 
 ## Explicación del diseño
 
