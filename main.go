@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime" 
+	"runtime"
 	"strings"
 )
 
@@ -36,15 +36,17 @@ type Vehiculo struct {
 	FechaEntrada string
 	FechaSalida  string
 	Incidencias  []*Incidencia
+	TiempoTotal  int
+	Prioritario  bool //falta añadir metodos
 }
 
 type Incidencia struct {
-	ID          int
-	Mecanicos   []*Mecanico
-	Tipo        Especialidad
-	Prioridad   string
-	Descripcion string
-	Estado      int // 0 abierta, 1 en proceso, 2 cerrada
+	ID              int
+	Mecanicos       []*Mecanico
+	Tipo            Especialidad
+	Prioridad       string
+	Descripcion     string
+	Estado          int // 0 abierta, 1 en proceso, 2 cerrada
 	TiempoAcumulado int // nuevo: tiempo total que lleva siendo atendida
 }
 
@@ -104,24 +106,25 @@ func (t *Taller) newVehiculo(mat string, mar string, mod string, fentrada string
 
 func (t *Taller) newIncidencia(mat string, mecs []*Mecanico, tip string, p string, d string) (*Incidencia, error) {
 	esp := Especialidad(strings.ToLower(tip))
-	
+
 	if esp != Mecanica && esp != Electrica && esp != Carroceria {
 		return nil, fmt.Errorf("tipo de incidencia inválido (%s)", tip)
 	}
-	
+
 	v := t.getVehiculo(mat)
 
 	if v == nil {
 		return nil, fmt.Errorf("vehículo con matrícula %s no encontrado", mat)
 	}
-	
+
 	inc := &Incidencia{
-		ID:          t.nextIncidenciaID,
-		Mecanicos:   mecs,
-		Tipo:        esp,
-		Prioridad:   p,
-		Descripcion: d,
-		Estado:      0,
+		ID:              t.nextIncidenciaID,
+		Mecanicos:       mecs,
+		Tipo:            esp,
+		Prioridad:       p,
+		Descripcion:     d,
+		Estado:          0,
+		TiempoAcumulado: 0,
 	}
 	t.nextIncidenciaID++
 
@@ -137,7 +140,7 @@ func (t *Taller) newMecanico(n string, e string, a int) *Mecanico {
 		fmt.Printf("Especialidad inválida (%s). Debe ser 'mecanica', 'electrica' o 'carroceria'.\n", e)
 		return nil
 	}
-	
+
 	m := &Mecanico{
 		ID:           t.nextMecanicoID,
 		Nombre:       n,
@@ -238,6 +241,17 @@ func (t *Taller) updateVehiculo(mat, marca, modelo, fEntrada, fSalida string) er
 	return nil
 }
 
+// Calcula el tiempo total acumulado de todas las incidencias de un vehículo
+func (t *Taller) updateTiempoTotalVehiculo(v *Vehiculo) {
+	total := 0
+	for _, inc := range v.Incidencias {
+		if inc.Estado != 2 { // solo las que aún no están terminadas
+			total += inc.TiempoAcumulado
+		}
+	}
+	v.TiempoTotal = total
+}
+
 func (t *Taller) updateMecanico(id int, nombre, especialidad string, a int, activo bool) error {
 	m := t.getMecanico(id)
 	if m == nil {
@@ -253,7 +267,6 @@ func (t *Taller) updateMecanico(id int, nombre, especialidad string, a int, acti
 		}
 		m.Especialidad = esp
 	}
-
 	if a != 0 {
 		m.AñosExp = a
 	}
@@ -274,7 +287,6 @@ func (t *Taller) updateMecanico(id int, nombre, especialidad string, a int, acti
 	m.Activo = activo
 	return nil
 }
-
 
 func (t *Taller) updateIncidencia(id int, tipo, prioridad, desc string, estado int) error {
 	inc := t.getIncidencia(id)
@@ -398,14 +410,14 @@ func (t *Taller) showVehiculosCliente(id int) {
 }
 
 func printVehiculo(v *Vehiculo) {
-	fmt.Printf("Vehículo %s: %s %s\n", v.Matricula, v.Marca, v.Modelo)
+	fmt.Printf("Vehículo %s: %s %s (Tiempo estimado en reparar incidencias %d)\n", v.Matricula, v.Marca, v.Modelo, v.TiempoTotal)
 	if len(v.Incidencias) == 0 {
 		fmt.Println("  Sin incidencias registradas")
 		return
 	}
 	fmt.Println("  Incidencias:")
 	for _, inc := range v.Incidencias {
-		fmt.Printf("   - [%s] %s (%s)\n", estadoToString(inc.Estado), inc.Tipo, inc.Prioridad)
+		fmt.Printf("   - [%s] %s (%s) tiempo estimado de reparación %d\n", estadoToString(inc.Estado), inc.Tipo, inc.Prioridad, inc.TiempoAcumulado)
 	}
 }
 
@@ -512,7 +524,7 @@ func (t *Taller) showMecanicosActivos() {
 
 	for _, m := range t.Mecanicos {
 		asignado := false
-		
+
 		for _, inc := range t.Incidencias {
 			for _, mec := range inc.Mecanicos {
 				if mec.ID == m.ID {
@@ -677,6 +689,17 @@ func (t *Taller) admitirCliente(clienteID int, v *Vehiculo, mecanicoID int) erro
 	return nil
 }
 
+/*
+func (t *Taller) showTiemposTotales() {
+	fmt.Println("\n--- TIEMPOS TOTALES POR VEHÍCULO ---")
+	for _, v := range t.Vehiculos {
+		t.updateTiempoTotalVehiculo(v)
+		fmt.Printf("Vehículo %s: %ds acumulados (%d incidencias)\n",
+			v.Matricula, v.TiempoTotal, len(v.Incidencias))
+	}
+}
+*/
+
 // ---------- SUBMENÚS DE LAS ESTRUCTURAS ----------
 
 func menuClientes(t *Taller) {
@@ -798,6 +821,8 @@ func menuVehiculos(t *Taller) {
 			fmt.Scanln(&fe)
 			fmt.Print("Fecha salida: ")
 			fmt.Scanln(&fs)
+			fmt.Print("Fecha salida: ")
+			fmt.Scanln(&fs)
 			if err := t.updateVehiculo(mat, marca, modelo, fe, fs); err != nil {
 				fmt.Println(err)
 			} else {
@@ -846,7 +871,7 @@ func menuVehiculos(t *Taller) {
 
 func menuIncidencias(t *Taller) {
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	for {
 		fmt.Println("\n--- INCIDENCIAS ---")
 		fmt.Println("1. Crear incidencia")
