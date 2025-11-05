@@ -78,7 +78,7 @@ func (t *Taller) verificarAsignacionMecanico(
 		// lanzar su goroutine para que pueda procesar trabajos
 		iniciarGoroutineMecanico(mecAdecuado, chTrabajos, chResultados, t)
 
-		chResultados <- fmt.Sprintf("👷 Contratado nuevo mecánico %s (%s) para incidencia %s",
+		chResultados <- fmt.Sprintf("Contratado nuevo mecánico %s (%s) para incidencia %s",
 			mecAdecuado.Nombre, mecAdecuado.Especialidad, inc.Tipo)
 	}
 
@@ -130,7 +130,7 @@ func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan str
 		t.updateTiempoTotalVehiculo(v)
 		//v.FechaSalida = time.Now().Format("2006-01-02 15:04:05")
 
-		//LIBERO AL MECANICO
+		// Libero al mecánico
 		m.Activo = true
 
 		// Si tras el trabajo la suma total supera 15, intentamos añadir un mecánico extra (prioridad)
