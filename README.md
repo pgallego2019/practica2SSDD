@@ -1,11 +1,9 @@
 # Practica 2 - Taller de Coches en GO 
 #### Sistemas Distribuidos - GIT - URJC 2025
 
-Con los mismos requisitos del Taller de coches de la práctica 1, se deberá hacer la implementación
-usando goroutines y channels de GO. A diferencia de la práctica 1, aquí se podrá usar más de un
-fichero.
+Con los mismos requisitos del Taller de coches de la práctica 1, se deberá hacer la implementación usando goroutines y channels de GO. A diferencia de la práctica 1, aquí se podrá usar más de un fichero.
 
-Como hay varios archivos fuente, necesito inicializar el módulo Go
+Como hay varios archivos fuente, es necesario inicializar el módulo Go
 ```
 paula@840g3:~/SSDD/practica2SSDD$ go mod init practica2SSDD
 paula@840g3:~/SSDD/practica2SSDD$ go run .
@@ -23,28 +21,28 @@ El sistema mantiene las estructuras principales de la práctica anterior, con al
 
 - Taller: estructura principal que agrupa listas de clientes, vehículos, mecánicos, incidencias y plazas de trabajo. No tiene modificaciones respecto a la práctica anterior.
 
-- Mecánico: contiene ID, nombre, especialidad (mecanica, electrica o carroceria), años de experiencia y estado activo.
+- Mecánico: contiene ID, nombre, especialidad (mecanica, electrica o carroceria), años de experiencia y estado activo (si está trabajando o no).
 
-- Vehículo: incluye información básica y una lista de incidencias asociadas. No tiene modificaciones respecto a la práctica anterior.
+- Vehículo: incluye información básica y una lista de incidencias asociadas. Ahora también incluye un campo tiempoAcumulado que se corresponde con el tiempoAcumulado de sus incidencias y un campo Prioritario para marcarlo cuando se trabaja en él.
 
-- Incidencia: contiene tipo (mecanica, electrica o carroceria), prioridad, descripción, estado (abierta/en proceso/cerrada) y un nuevo campo TiempoAcumulado para medir el tiempo total de atención.
+- Incidencia: contiene tipo (mecanica, electrica o carroceria), prioridad, descripción, estado (abierta/en proceso/cerrada) y un nuevo campo TiempoAcumulado para medir el tiempo total de atención según especialidad.
 
 - Trabajo: nueva estructura introducida en simulacion.go, representa una unidad de trabajo que asocia un vehículo y una incidencia a ser procesada por un mecánico concurrentemente.
 
 El **diagrama de clases** representa las nuevas estructuras
 
+![diagrama de clases](https://github.com/pgallego2019/practica2SSDD/blob/main/diagramas/diagramaspractica2ssdd-Diagrama%20de%20clases.drawio.png)
 
-Vehículo – Trabajo: un vehículo puede ser atendido en múltiples ocasiones (0..*), pero cada trabajo pertenece a un único vehículo (1).
+Las relaciones entre clases se explican como:
 
-Incidencia – Trabajo: cada incidencia registrada genera exactamente un trabajo (1 a 1), que representa el proceso de atención concurrente.
+- Vehículo –> Trabajo: Un vehículo puede ser atendido en múltiples ocasiones (0..*), pero cada trabajo pertenece a un único vehículo (1).
+
+- Incidencia –> Trabajo: Cada incidencia registrada genera exactamente un trabajo (1 a 1), que representa el proceso de atención concurrente.
 
 Aunque en el diagrama de clases no se representa una relación directa entre Mecánico y Trabajo, en la simulación concurrente cada mecánico ejecuta la función trabajoMecanico, procesando diferentes trabajos de forma paralela. Esta relación de tipo “atiende” se modela dinámicamente mediante goroutines y canales en el módulo simulacion.go.
 
-### Funciones principales
-1. simularTaller(t *Taller)
-
-Inicia la simulación concurrente del taller, que es una opción en el menú principal.
-Para esto crea dos canales:
+### Funciones principales y funcionamiento de la aplicación
+1. _**simularTaller(t *Taller)**_: Inicia la simulación concurrente del taller, que es una opción en el menú principal. Para esto crea dos canales:
 
 - chTrabajos: cola de espera de trabajos (vehículos que llegan).
 
@@ -58,37 +56,67 @@ Luego lanza goroutines:
 
 - Una para imprimir resultados (imprimirResultados).
 
-Por último, espera 60 segundos antes de cerrar la simulación para que acaben todos los trabajos.
+2. _**verificarAsignacionMecanico(m *Mecanico, v *Vehiculo, inc *Incidencia, chResultados chan string, chTrabajos chan Trabajo,) bool)**_: Función auxiliar de control que determina si un mecánico puede atender una incidencia determinada. Devuelve true si el mecánico puede continuar con la reparación y false si la incidencia debe ser reasignada o atendida por otro mecánico. Su comportamiento se resume así:
 
-2. trabajoMecanico(m *Mecanico, chTrabajos, chResultados, t)
+- Verificación de estado: Si la incidencia ya está cerrada (Estado == 2), no se procesa.
 
-Cada mecánico ejecuta esta goroutine de forma independiente.
-Lee trabajos del canal chTrabajos, simula la reparación con time.Sleep según su especialidad y acumula el tiempo en la incidencia.
+- Coincidencia de especialidad: Si la especialidad del mecánico coincide con el tipo de incidencia (m.Especialidad == inc.Tipo), el mecánico puede atenderla directamente.
 
-Si una incidencia supera los 15 segundos acumulados, se le da prioridad. Para esto se intenta buscar un nuevo mecánico libre, pero si no hay se contrata un nuevo mecánico automáticamente y el trabajo se reenvía a la cola de espera.
+- Prioridad por tiempo acumulado: Si el vehículo supera los 15 segundos de atención total (v.TiempoTotal > 15), la incidencia obtiene prioridad. En este caso, cualquier mecánico disponible puede atenderla, incluso si su especialidad no coincide.
 
-3. generadorVehículos(t, chTrabajos)
+- Reasignación de trabajo: Si la incidencia está en proceso por otro mecánico y aún no ha alcanzado prioridad, se omite el trabajo para evitar duplicidad de procesamiento concurrente.
 
-Genera de forma periódica vehículos nuevos (cada 2 segundos) con distintos tipos de incidencia (mecánica, eléctrica, carrocería) y los envía al canal de trabajos.
+- Contratación dinámica: Si no hay mecánicos disponibles de la especialidad requerida, la función crea un nuevo mecánico con newMecanico(), lanza su goroutine con iniciarGoroutineMecanico() y registra el evento en chResultados.
 
-4. imprimirResultados(chResultados)
+- Reenvío de trabajo: Cuando se contrata un nuevo mecánico o se encuentra uno más adecuado, el trabajo se reenvía a la cola chTrabajos mediante reasignarTrabajo() para su futura atención.
 
-Goroutine dedicada a mostrar en pantalla los mensajes que van llegando sobre eventos del sistema: inicio y fin de trabajos, reasignaciones, contrataciones, etc.
+Esta función actúa como mecanismo de decisión y equilibrio de carga dentro del sistema concurrente, evitando bloqueos, distribuyendo eficientemente los trabajos y asegurando que las incidencias prioritarias se atiendan con rapidez.
 
-### Funcionamiento de la aplicación
-Cuando desde el menú principal se elige la opción de simular taller, se ejecuta lo siguiente:
+3. _**trabajoMecanico(m *Mecanico, chTrabajos, chResultados, t)**_: Cada mecánico ejecuta esta goroutine de forma independiente. Lee trabajos del canal chTrabajos, revisa si la incidencia está cerrada (para saltar ese trabajo), revisa si el mecánico puede trabajar en esa incidencia  (_verificarAsignacionMecanico_) y si puede trabajar, simula la reparación con time.Sleep según su especialidad y acumula el tiempo en la incidencia y en el vehículo. Si una incidencia supera los 15 segundos acumulados, se le da prioridad. Para esto se intenta buscar un nuevo mecánico libre, pero si no hay se contrata un nuevo mecánico automáticamente y el trabajo se reenvía a la cola de espera.
 
-1. Si no hay mecánicos creados, se crean tres por defecto (uno de cada especialidad)
+4. _**generadorVehículos(t, chTrabajos)**_: Genera de forma periódica vehículos nuevos (cada 2 segundos) con distintos tipos de incidencia (mecánica, eléctrica, carrocería) y los envía al canal de trabajos.
 
-2. Los vehículos llegan de forma simulada y se insertan en una cola de espera.
+5. _**imprimirResultados(chResultados)**_: Goroutine dedicada a mostrar en pantalla los mensajes que van llegando sobre eventos del sistema: inicio y fin de trabajos, reasignaciones, contrataciones, etc.
 
-3. Cada mecánico toma un trabajo de la cola, y lo procesa durante el tiempo necesario según la especialidad.
+#### Representación dinámica: Diagrama de secuencia
 
-4. Si un vehículo acumula más de 15 segundos de atención, se le da prioridad, se busca uno libre (aunque no sea de la especialidad del trabajo) o se contrata un mecánico nuevo (este sí de la especialidad de trabajo) y se reasigna el trabajo.
+En el **diagrama de secuencia** mostramos la interacción entre los principales componentes del sistema durante la simulación del taller. Representa cómo se comunican las goroutines a través de los canales (chTrabajos y chResultados) para gestionar concurrentemente los trabajos de reparación.
 
-5. Tras 60 segundos de simulación, los canales se cieran y se imprimen los resultados finales.
+![diagrama de secuencia](https://github.com/pgallego2019/practica2SSDD/blob/main/diagramas/diagramaspractica2ssdd-Diagrama%20de%20secuencia.drawio.png)
 
-El **diagrama de flujo** representa el funcionamiento de la simulación.
+La secuencia se puede explicar como: 
+1. Inicio de la simulación: La función simularTaller() crea los canales y lanza las goroutines: una por cada mecánico (trabajoMecanico), una para generar vehículos (generadorVehículos) y otra para imprimir los resultados (imprimirResultados).
+
+2. Generación de vehículos: generadorVehículos crea periódicamente instancias de Vehículo con incidencias aleatorias.
+Cada incidencia se encapsula en un objeto Trabajo y se envía al canal chTrabajos.
+
+3. Procesamiento de trabajos: Cada goroutine de trabajoMecanico escucha el canal chTrabajos. Cuando recibe un trabajo, el mecánico simula la reparación con time.Sleep, acumula el tiempo en la incidencia y envía un mensaje de progreso por chResultados.
+
+4. Reasignación o contratación: Si una incidencia supera los 15 segundos de atención acumulada, se marca como prioritaria. trabajoMecanico intenta reasignarla a un mecánico disponible; si no hay, simularTaller crea un nuevo mecánico y reenvía el trabajo al canal.
+
+5. Registro de eventos: La goroutine imprimirResultados escucha continuamente el canal chResultados y muestra los eventos en la consola (inicio y fin de trabajos, reasignaciones, contrataciones, etc.).
+
+6. Finalización: Tras 60 segundos, simularTaller cierra los canales y espera a que todas las goroutines finalicen su ejecución antes de imprimir el resumen.
+
+#### Representación general: Diagrama de flujo
+
+Mientras el diagrama de secuencia muestra las interacciones entre procesos concurrentes, el **diagrama de flujo** ofrece una visión global del funcionamiento de la simulación, desde la inicialización hasta el cierre de la ejecución.
+
+![diagrama de flujo](https://github.com/pgallego2019/practica2SSDD/blob/main/diagramas/diagramaspractica2ssdd-Diagrama%20de%20flujo.drawio.png)
+
+Este diagrama refleja el ciclo completo del sistema:
+
+1. Inicialización de datos y creación de mecánicos.
+
+2. Inicio de la simulación y generación de vehículos.
+
+3. Procesamiento concurrente de incidencias por los mecánicos.
+
+4. Control de prioridades y contratación dinámica.
+
+5. Registro y visualización de resultados.
+
+6. Finalización y cierre controlado de los canales.
 
 ## Test realizados
 El objetivo de esta sección es analizar el comportamiento del taller bajo distintas condiciones de carga y distribución de mecánicos, simulando el procesamiento de incidencias de vehículos de manera concurrente. Se comparan tres escenarios principales:
@@ -130,7 +158,7 @@ Las métricas registradas son:
 
 #### Escenarios
 
-**Duplicación de incidencias por vehículo**
+#### · Duplicación de incidencias por vehículo
 - Escenario: 4 vehículos, 2 incidencias por vehículo (duplicación respecto al caso base de 1 incidencia).
 - Plantilla: 1 mecánico por especialidad.
 Resultados:
@@ -144,7 +172,7 @@ Resultados:
 
 Al duplicar el número de incidencias, los mecánicos existentes pudieron atender todas las incidencias, pero algunos mecánicos alcanzaron más carga de trabajo, lo que podría afectar el tiempo total de atención en un escenario real con duraciones simuladas.
 
-**Duplicación de plantilla de mecánicos**
+#### · Duplicación de plantilla de mecánicos
 - Escenario: 4 vehículos, 1 incidencia por vehículo.
 - Plantilla: 2 mecánicos por especialidad (6 en total).
 Resultados:
@@ -161,7 +189,7 @@ Resultados:
 
 La duplicación de la plantilla permite repartir mejor la carga, aunque en este escenario con pocas incidencias algunos mecánicos no llegan a atender ninguna incidencia
 
-**Distribución desigual de mecánicos**
+#### · Distribución desigual de mecánicos
 - Caso 1: 3 mecánica, 1 eléctrica, 1 carrocería
 
 - Caso 2: 1 mecánica, 3 eléctrica, 3 carrocería
@@ -183,3 +211,6 @@ Se observa que distribuir la plantilla según la demanda de especialidades permi
 - Duplicación de plantilla: Incrementar la cantidad de mecánicos reduce la carga individual, mejorando la capacidad de atención simultánea.
 
 - Distribución de especialidades: La asignación estratégica de mecánicos según tipo de incidencia es crucial para evitar sobrecarga y optimizar la eficiencia del taller.
+
+En conjunto, la práctica demuestra cómo la concurrencia en Go permite diseñar sistemas escalables y eficientes mediante el uso coordinado de goroutines y canales, mejorando significativamente la capacidad de respuesta del taller frente al enfoque secuencial de la práctica anterior.
+
