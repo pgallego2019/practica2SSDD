@@ -95,12 +95,7 @@ func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan str
 		v := trabajo.Vehiculo
 		inc := trabajo.Incidencia
 
-		// Si la incidencia ya está cerrada, saltarla
-		if inc.Estado == 2 {
-			continue
-		}
-
-		// Verificar si este mecánico puede atender la incidencia
+		// Verificar si este mecánico puede atender la incidencia o si la incidencia ya está cerrada, saltarla
 		if !t.verificarAsignacionMecanico(m, v, inc, chResultados, chTrabajos) {
 			continue
 		}
