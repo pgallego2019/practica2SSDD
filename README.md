@@ -163,12 +163,23 @@ Las métricas registradas son:
 - Plantilla: 1 mecánico por especialidad.
 Resultados:
 
-| Mecánico | Incidencias atendidas |
-|:-------- |:--------:|
-| MecMecanica   | 3   |
-| MecElectrica   | 3   |
-| MecCarroceria   | 2   |
-| Total   | 8   |
+´´´
+=== RUN   TestSimulacionDuplicarIncidencias
+=== Resultados de la simulación ===
+-> Mecmecanica terminó carroceria de vehículo V-01
+-> Mecmecanica terminó carroceria de vehículo V-02
+-> Mecmecanica terminó mecanica de vehículo V-02
+-> Mecmecanica terminó electrica de vehículo V-03
+-> Mecmecanica terminó electrica de vehículo V-03
+-> Mecmecanica terminó mecanica de vehículo V-04
+-> Mecmecanica terminó carroceria de vehículo V-04
+-> Mecelectrica terminó carroceria de vehículo V-01
+Total de incidencias procesadas: 8
+Incidencias por mecánico:
+  Mecmecanica: 7
+  Mecelectrica: 1
+--- PASS: TestSimulacionDuplicarIncidencias (0.00s)
+´´
 
 Al duplicar el número de incidencias, los mecánicos existentes pudieron atender todas las incidencias, pero algunos mecánicos alcanzaron más carga de trabajo, lo que podría afectar el tiempo total de atención en un escenario real con duraciones simuladas.
 
@@ -177,15 +188,19 @@ Al duplicar el número de incidencias, los mecánicos existentes pudieron atende
 - Plantilla: 2 mecánicos por especialidad (6 en total).
 Resultados:
 
-| Mecánico | Incidencias atendidas |
-|:-------- |:--------:|
-| MecMecanica1   | 1   |
-| MecMecanica2  | 0   |
-| MecElectrica1   | 1   |
-| MecElectrica2   | 0  |
-| MecCarroceria1   | 1   |
-| MecCarroceria2   | 0   |
-| Total   | 3  |
+´´´
+=== RUN   TestSimulacionDuplicarMecanicos
+=== Resultados de la simulación ===
+-> Mecmecanica terminó carroceria de vehículo V-01
+-> Mecmecanica terminó carroceria de vehículo V-03
+-> Mecmecanica terminó mecanica de vehículo V-04
+-> Mecelectrica terminó carroceria de vehículo V-02
+Total de incidencias procesadas: 4
+Incidencias por mecánico:
+  Mecmecanica: 3
+  Mecelectrica: 1
+--- PASS: TestSimulacionDuplicarMecanicos (0.00s)
+´´´
 
 La duplicación de la plantilla permite repartir mejor la carga, aunque en este escenario con pocas incidencias algunos mecánicos no llegan a atender ninguna incidencia
 
@@ -196,10 +211,28 @@ La duplicación de la plantilla permite repartir mejor la carga, aunque en este 
 
 - Escenario: 4 vehículos, 1 incidencia por vehículo.
 
-|Distribución | Total incidencias procesadas |Observaciones |
-|:-------- |:--------:|:--------:|
-| Caso 1   | 4   | Mayor carga para mecánicos de mecánica, eléctrica y carrocería menos cargados. |
-| Caso 2  | 4   | Mayor distribución en eléctrica y carrocería, mecánico de mecánica sobrecargado. |
+```
+=== RUN   TestSimulacionDistribucionMecanicos
+=== Resultados de la simulación ===
+-> Mecmecanica terminó carroceria de vehículo V-01
+-> Mecmecanica terminó carroceria de vehículo V-02
+-> Mecmecanica terminó carroceria de vehículo V-03
+-> Mecmecanica terminó mecanica de vehículo V-04
+Total de incidencias procesadas: 4
+Incidencias por mecánico:
+  Mecmecanica: 4
+=== Resultados de la simulación ===
+-> Mecelectrica terminó electrica de vehículo V-01
+-> Mecelectrica terminó mecanica de vehículo V-03
+-> Meccarroceria terminó carroceria de vehículo V-04
+-> Mecmecanica terminó electrica de vehículo V-02
+Total de incidencias procesadas: 4
+Incidencias por mecánico:
+  Mecelectrica: 2
+  Meccarroceria: 1
+  Mecmecanica: 1
+--- PASS: TestSimulacionDistribucionMecanicos (0.00s)
+```
 
 El balance de mecánicos afecta directamente la eficiencia y la carga por trabajador.
 
