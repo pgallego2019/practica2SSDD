@@ -37,12 +37,7 @@ func (t *Taller) verificarAsignacionMecanico(
 	chResultados chan string,
 	chTrabajos chan Trabajo,
 ) bool {
-
-	// Si la incidencia ya está cerrada, no se procesa
-	if inc.Estado == 2 {
-		return false
-	}
-
+	
 	// Si la especialidad coincide, puede atender sin problema
 	if inc.Tipo == m.Especialidad {
 		return true
@@ -95,7 +90,12 @@ func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan str
 		v := trabajo.Vehiculo
 		inc := trabajo.Incidencia
 
-		// Verificar si este mecánico puede atender la incidencia o si la incidencia ya está cerrada, saltarla
+		// Si la incidencia ya está cerrada, saltarla
+		if inc.Estado == 2 {
+			continue
+		}
+		
+		// Verificar si este mecánico puede atender la incidencia
 		if !t.verificarAsignacionMecanico(m, v, inc, chResultados, chTrabajos) {
 			continue
 		}
