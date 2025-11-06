@@ -2,14 +2,14 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 )
 
-// ---------- HELPERS ----------
+// ---------- AUXILIARES ----------
 
-// Crear taller con mecánicos según un mapa de especialidades
 func crearTallerConMecanicos(nombre string, plantilla map[Especialidad]int) *Taller {
 	t := &Taller{}
 	for esp, cantidad := range plantilla {
@@ -20,12 +20,11 @@ func crearTallerConMecanicos(nombre string, plantilla map[Especialidad]int) *Tal
 	return t
 }
 
-// Generar vehículos con incidencias controladas
 func generarVehiculosParaTest(t *Taller, numVehiculos int, numIncidencias int, tipos []Especialidad, r *rand.Rand) []*Vehiculo {
 	var vehiculos []*Vehiculo
 	for i := 1; i <= numVehiculos; i++ {
 		v := t.newVehiculo(
-			string(rune('A'+i-1)), // Matrícula simple A, B, C...
+			fmt.Sprintf("V-%02d", i),
 			"Marca",
 			"Modelo",
 			time.Now().Format("2006-01-02 15:04:05"),
@@ -50,25 +49,25 @@ func generarVehiculosParaTest(t *Taller, numVehiculos int, numIncidencias int, t
 	return vehiculos
 }
 
-// Simulación “controlada” para test sin sleeps ni prints
-func simularTallerTest(t *Taller, vehiculos []*Vehiculo) []string {
-	var resultados []string
+// simulación controlada que devuelve estadísticas
+func simularTallerConStats(t *Taller, vehiculos []*Vehiculo) map[string]int {
 	chTrabajos := make(chan Trabajo, 100)
 	chResultados := make(chan string, 100)
-
 	done := make(chan struct{})
 
-	// lanzar mecánicos
+	// mapa para contar incidencias por mecánico
+	stats := make(map[string]int)
+
 	for _, m := range t.Mecanicos {
 		go func(m *Mecanico) {
 			for trabajo := range chTrabajos {
-				//v := trabajo.Vehiculo
 				inc := trabajo.Incidencia
 				if inc.Estado == 2 {
 					continue
 				}
 				inc.Estado = 2
-				chResultados <- m.Nombre + " terminó " + string(inc.Tipo)
+				stats[m.Nombre]++
+				chResultados <- fmt.Sprintf("%s terminó %s de vehículo %s", m.Nombre, inc.Tipo, trabajo.Vehiculo.Matricula)
 			}
 			done <- struct{}{}
 		}(m)
@@ -90,12 +89,20 @@ func simularTallerTest(t *Taller, vehiculos []*Vehiculo) []string {
 	}
 	close(chResultados)
 
-	// recoger resultados
+	// imprimir resultados detallados
+	fmt.Println("=== Resultados de la simulación ===")
+	total := 0
 	for msg := range chResultados {
-		resultados = append(resultados, msg)
+		fmt.Println("->", msg)
+		total++
+	}
+	fmt.Printf("Total de incidencias procesadas: %d\n", total)
+	fmt.Println("Incidencias por mecánico:")
+	for mec, n := range stats {
+		fmt.Printf("  %s: %d\n", mec, n)
 	}
 
-	return resultados
+	return stats
 }
 
 // ---------- TESTS ----------
@@ -107,14 +114,18 @@ func TestSimulacionDuplicarIncidencias(t *testing.T) {
 		Electrica:  1,
 		Carroceria: 1,
 	})
-
 	tipos := []Especialidad{Mecanica, Electrica, Carroceria}
-	vehiculos := generarVehiculosParaTest(taller, 4, 2, tipos, r) // duplicamos incidencias
+	vehiculos := generarVehiculosParaTest(taller, 4, 2, tipos, r)
 
-	resultados := simularTallerTest(taller, vehiculos)
+	stats := simularTallerConStats(taller, vehiculos)
 
-	if len(resultados) != 4*2 {
-		t.Errorf("Se esperaban %d resultados, se obtuvieron %d", 4*2, len(resultados))
+	expected := 4 * 2
+	sum := 0
+	for _, n := range stats {
+		sum += n
+	}
+	if sum != expected {
+		t.Errorf("Se esperaban %d incidencias, se obtuvieron %d", expected, sum)
 	}
 }
 
@@ -125,14 +136,18 @@ func TestSimulacionDuplicarMecanicos(t *testing.T) {
 		Electrica:  2,
 		Carroceria: 2,
 	})
-
 	tipos := []Especialidad{Mecanica, Electrica, Carroceria}
 	vehiculos := generarVehiculosParaTest(taller, 4, 1, tipos, r)
 
-	resultados := simularTallerTest(taller, vehiculos)
+	stats := simularTallerConStats(taller, vehiculos)
 
-	if len(resultados) != 4*1 {
-		t.Errorf("Se esperaban %d resultados, se obtuvieron %d", 4*1, len(resultados))
+	expected := 4 * 1
+	sum := 0
+	for _, n := range stats {
+		sum += n
+	}
+	if sum != expected {
+		t.Errorf("Se esperaban %d incidencias, se obtuvieron %d", expected, sum)
 	}
 }
 
@@ -140,25 +155,31 @@ func TestSimulacionDistribucionMecanicos(t *testing.T) {
 	r := rand.New(rand.NewSource(42))
 	tipos := []Especialidad{Mecanica, Electrica, Carroceria}
 
-	// Caso 1: 3 mecánica, 1 eléctrica, 1 carrocería
 	taller1 := crearTallerConMecanicos("Mec", map[Especialidad]int{
 		Mecanica:   3,
 		Electrica:  1,
 		Carroceria: 1,
 	})
 	vehiculos1 := generarVehiculosParaTest(taller1, 4, 1, tipos, r)
-	resultados1 := simularTallerTest(taller1, vehiculos1)
+	stats1 := simularTallerConStats(taller1, vehiculos1)
 
-	// Caso 2: 1 mecánica, 3 eléctrica, 3 carrocería
 	taller2 := crearTallerConMecanicos("Mec", map[Especialidad]int{
 		Mecanica:   1,
 		Electrica:  3,
 		Carroceria: 3,
 	})
 	vehiculos2 := generarVehiculosParaTest(taller2, 4, 1, tipos, r)
-	resultados2 := simularTallerTest(taller2, vehiculos2)
+	stats2 := simularTallerConStats(taller2, vehiculos2)
 
-	if len(resultados1) != len(resultados2) {
-		t.Errorf("Resultados difieren entre distribuciones: %d vs %d", len(resultados1), len(resultados2))
+	sum1, sum2 := 0, 0
+	for _, n := range stats1 {
+		sum1 += n
+	}
+	for _, n := range stats2 {
+		sum2 += n
+	}
+
+	if sum1 != sum2 {
+		t.Errorf("Resultados difieren entre distribuciones: %d vs %d", sum1, sum2)
 	}
 }
