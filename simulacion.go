@@ -29,62 +29,23 @@ func iniciarGoroutineMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados
 }
 
 // Verifica si el mecánico puede atender la incidencia.
-// Devuelve true si puede continuar, false si se reasigna o contrata otro mecánico.
+// Devuelve true si puede continuar, false si se debe reasignar o contrata otro mecánico.
 func (t *Taller) verificarAsignacionMecanico(
 	m *Mecanico,
 	v *Vehiculo,
 	inc *Incidencia,
-	chResultados chan string,
-	chTrabajos chan Trabajo,
 ) bool {
-	
-	// Si la especialidad coincide, puede atender sin problema
-	if inc.Tipo == m.Especialidad {
-		return true
-	}
-
-	// Si el vehículo ya tiene prioridad (>15s), puede atenderlo aunque no coincida
-	t.updateTiempoTotalVehiculo(v)
-	if v.TiempoTotal > 15 {
-		return true
-	}
-
-	// Si ya está en proceso por otro mecánico y no hay prioridad, no reasignamos
-	if inc.Estado == 1 && v.TiempoTotal <= 15 {
+	if inc.Estado == 1 {
 		return false
 	}
-
-	// Buscar otro mecánico disponible de la especialidad requerida
-	var mecAdecuado *Mecanico
-	for _, candidato := range t.Mecanicos {
-		if candidato.Activo && candidato.Especialidad == inc.Tipo {
-			mecAdecuado = candidato
-			break
-		}
-	}
-
-	// Si no hay mecánico disponible de esa especialidad, contratar uno nuevo y arrancarle la goroutine
-	if mecAdecuado == nil {
-		mecAdecuado = t.newMecanico(
-			fmt.Sprintf("Auto-%s", inc.Tipo),
-			string(inc.Tipo),
-			1,
-		)
-		// lanzar su goroutine para que pueda procesar trabajos
-		iniciarGoroutineMecanico(mecAdecuado, chTrabajos, chResultados, t)
-
-		chResultados <- fmt.Sprintf("Contratado nuevo mecánico %s (%s) para incidencia %s",
-			mecAdecuado.Nombre, mecAdecuado.Especialidad, inc.Tipo)
-	}
-
-	// Reasignar el trabajo a la cola UNA vez (si todavía no está cerrado)
-	if inc.Estado != 2 {
-		reasignarTrabajo(chTrabajos, v, inc)
+	// Si la especialidad coincide o el vehículo es prioritario, puede atenderlo
+	if inc.Tipo == m.Especialidad || v.Prioritario {
+		return true
 	}
 	return false
 }
 
-// Goroutine
+// Goroutine de cada mecánico
 func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan string, t *Taller) {
 	for trabajo := range chTrabajos {
 		v := trabajo.Vehiculo
@@ -94,78 +55,57 @@ func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan str
 		if inc.Estado == 2 {
 			continue
 		}
-		
+
 		// Verificar si este mecánico puede atender la incidencia
-		if !t.verificarAsignacionMecanico(m, v, inc, chResultados, chTrabajos) {
-			continue
-		}
-
-		m.Activo = false
-
-		fmt.Printf("Mecánico %s (%s) atendiendo vehículos %s [%s]\n",
-			m.Nombre, m.Especialidad, v.Matricula, inc.Tipo)
-
-		// Simulación según la especialidad
-		var duracion int
-		switch inc.Tipo {
-		case Mecanica:
-			duracion = 5
-		case Electrica:
-			duracion = 7
-		case Carroceria:
-			duracion = 11
-		default:
-			duracion = 5
-		}
-
-		time.Sleep(time.Duration(duracion) * time.Second)
-
-		// Acumular tiempo de atención
-		inc.TiempoAcumulado += duracion
-		t.updateTiempoTotalVehiculo(v)
-		//v.FechaSalida = time.Now().Format("2006-01-02 15:04:05")
-
-		// Libero al mecánico
-		m.Activo = true
-
-		// Si tras el trabajo la suma total supera 15, intentamos añadir un mecánico extra (prioridad)
-		if v.TiempoTotal > 15 {
-			// Aviso (no lo hacemos infinitas veces porque v.Prioritario ya se puso true)
-			chResultados <- fmt.Sprintf("Vehículo %s acumula %ds — necesita prioridad", v.Matricula, v.TiempoTotal)
-
-			// Buscar otro mecánico libre (de cualquier especialidad diferente al actual)
+		if !t.verificarAsignacionMecanico(m, v, inc) {
+			// Buscar otro mecánico disponible de la especialidad correcta
 			var mecLibre *Mecanico
 			for _, candidato := range t.Mecanicos {
-				if candidato.Activo && candidato.ID != m.ID {
+				if candidato.Activo && candidato.Especialidad == inc.Tipo && candidato.ID != m.ID {
 					mecLibre = candidato
 					break
 				}
 			}
 
-			// Si no hay otro, contratar y arrancar su goroutine
+			// Si no hay, contratamos uno nuevo
 			if mecLibre == nil {
 				mecLibre = t.newMecanico(fmt.Sprintf("Auto-%s", inc.Tipo), string(inc.Tipo), 1)
 				iniciarGoroutineMecanico(mecLibre, chTrabajos, chResultados, t)
-				chResultados <- fmt.Sprintf("Contratado nuevo mecánico: %s (%s)", mecLibre.Nombre, mecLibre.Especialidad)
+				chResultados <- fmt.Sprintf("No había mecánicos disponibles (%s) — contratado nuevo: %s",
+					inc.Tipo, mecLibre.Nombre)
 			}
 
-			// Reasignar UNA vez para que otro mecánico (u el nuevo) coja la incidencia y ayude
-			if inc.Estado != 2 {
-				reasignarTrabajo(chTrabajos, v, inc)
-			}
-
-			// No cerramos la incidencia aquí (pues aún quedan trabajos por hacer)
+			reasignarTrabajo(chTrabajos, v, inc)
 			continue
 		}
-		// Si no necesita prioridad, marcar como cerrada
+
+		m.Activo = false
+		inc.Estado = 1
+
+		fmt.Printf("Mecánico %s (%s) atendiendo vehículos %s [%s]\n", m.Nombre, m.Especialidad, v.Matricula, inc.Tipo)
+
+		duracion := inc.TiempoAcumulado
+		time.Sleep(time.Duration(duracion) * time.Second)
+
 		inc.Estado = 2
-		msg3 := fmt.Sprintf("Mecánico %s terminó incidencia del vehículo %s (%s) en %ds [Total %ds]",
-			m.Nombre, v.Matricula, inc.Tipo, duracion, v.TiempoTotal)
-		chResultados <- msg3
+		v.TiempoTotal += duracion
+		t.updateTiempoTotalVehiculo(v)
+		m.Activo = true
+
+		// Reportar resultado final
+		if v.TiempoTotal == 0 {
+			chResultados <- fmt.Sprintf(
+				"Mecánico %s terminó incidencia del vehículo %s (%s) en %ds.\nEl vehículo %s está reparado",
+				m.Nombre, v.Matricula, inc.Tipo, duracion, v.Matricula)
+		} else {
+			chResultados <- fmt.Sprintf(
+				"Mecánico %s terminó incidencia del vehículo %s (%s) en %ds [Tiempo restante del vehículo %ds]",
+				m.Nombre, v.Matricula, inc.Tipo, duracion, v.TiempoTotal)
+		}
 	}
 }
 
-// Goroutine generadora
+// Goroutine generadora de vehículos e incidencias para alimentar el canal de trabajos
 func generadorVehículos(t *Taller, chTrabajos chan Trabajo) {
 	tipos := []Especialidad{Mecanica, Electrica, Carroceria}
 
@@ -184,21 +124,29 @@ func generadorVehículos(t *Taller, chTrabajos chan Trabajo) {
 
 		for j := 0; j < numInc; j++ {
 			tipo := tipos[rand.Intn(len(tipos))]
-			inc := &Incidencia{
-				ID:              len(t.Incidencias) + 1,
-				Tipo:            tipo,
-				Prioridad:       "Alta",
-				Descripcion:     fmt.Sprintf("Mantenimiento %s", tipo),
-				Estado:          0,
-				TiempoAcumulado: 0,
+
+			inc, err := t.newIncidencia(
+				v.Matricula,
+				nil,
+				string(tipo),
+				"Alta",
+				fmt.Sprintf("Mantenimiento %s", tipo),
+			)
+			if err != nil {
+				fmt.Println("Error creando incidencia:", err)
+				continue
 			}
 
-			v.Incidencias = append(v.Incidencias, inc)
-			t.Incidencias = append(t.Incidencias, inc)
+			fmt.Printf("Llega vehículo %s con incidencia %s (tiempo estimado %d s)\n",
+				v.Matricula, inc.Tipo, inc.TiempoAcumulado)
 
-			// Enviar cada incidencia como trabajo
-			fmt.Printf("Llega vehículo %s con incidencia %s\n", v.Matricula, tipo)
 			chTrabajos <- Trabajo{Vehiculo: v, Incidencia: inc}
+		}
+
+		t.updateTiempoTotalVehiculo(v)
+		fmt.Printf("El vehículo %s necesitará %d segundos en total\n", v.Matricula, v.TiempoTotal)
+		if v.Prioritario {
+			fmt.Printf("El vehículo %s tiene prioridad\n", v.Matricula)
 		}
 
 		time.Sleep(2 * time.Second) // simulando tiempo entre llegadas
@@ -212,6 +160,9 @@ func imprimirResultados(chResultados chan string) {
 	}
 }
 
+//NOTA: no cierro los canales para evitar panic writing on closed channel
+
+// Función principal de simulación concurrente
 func simularTaller(t *Taller) {
 	fmt.Println("\n=== SIMULACIÓN CONCURRENTE DEL TALLER ===")
 
@@ -239,8 +190,8 @@ func simularTaller(t *Taller) {
 	}()
 
 	fmt.Println("(Simulando... espera unos segundos)")
-	time.Sleep(20 * time.Second)
+	time.Sleep(60 * time.Second)
 
-	close(chResultados)
+	//close(chResultados)
 	fmt.Println("\n=== Fin de la simulación ===")
 }
