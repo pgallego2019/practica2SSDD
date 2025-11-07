@@ -37,7 +37,7 @@ type Vehiculo struct {
 	FechaSalida  string
 	Incidencias  []*Incidencia
 	TiempoTotal  int
-	Prioritario  bool //falta añadir metodos
+	Prioritario  bool
 }
 
 type Incidencia struct {
@@ -47,13 +47,13 @@ type Incidencia struct {
 	Prioridad       string
 	Descripcion     string
 	Estado          int // 0 abierta, 1 en proceso, 2 cerrada
-	TiempoAcumulado int // nuevo: tiempo total que lleva siendo atendida
+	TiempoAcumulado int
 }
 
 type Mecanico struct {
 	ID           int
 	Nombre       string
-	Especialidad Especialidad // nuevo: tipo enumerado
+	Especialidad Especialidad
 	AñosExp      int
 	Activo       bool
 }
@@ -99,6 +99,8 @@ func (t *Taller) newVehiculo(mat string, mar string, mod string, fentrada string
 		FechaEntrada: fentrada,
 		FechaSalida:  fsalida,
 		Incidencias:  ins,
+		TiempoTotal:  0,
+		Prioritario:  false,
 	}
 	t.Vehiculos = append(t.Vehiculos, v)
 	return v
@@ -128,8 +130,18 @@ func (t *Taller) newIncidencia(mat string, mecs []*Mecanico, tip string, p strin
 	}
 	t.nextIncidenciaID++
 
+	switch esp {
+	case Mecanica:
+		inc.TiempoAcumulado = 5
+	case Electrica:
+		inc.TiempoAcumulado = 7
+	case Carroceria:
+		inc.TiempoAcumulado = 11
+	}
+
 	t.Incidencias = append(t.Incidencias, inc)
 	v.Incidencias = append(v.Incidencias, inc)
+	t.updateTiempoTotalVehiculo(v)
 	return inc, nil
 }
 
@@ -151,7 +163,6 @@ func (t *Taller) newMecanico(n string, e string, a int) *Mecanico {
 	t.nextMecanicoID++
 	t.Mecanicos = append(t.Mecanicos, m)
 
-	// Crear 2 nuevas plazas por cada mecánico
 	for i := 0; i < 2; i++ {
 		plazaID := len(t.Plazas) + 1
 		p := &Plaza{
@@ -241,15 +252,18 @@ func (t *Taller) updateVehiculo(mat, marca, modelo, fEntrada, fSalida string) er
 	return nil
 }
 
-// Calcula el tiempo total acumulado de todas las incidencias de un vehículo
 func (t *Taller) updateTiempoTotalVehiculo(v *Vehiculo) {
 	total := 0
 	for _, inc := range v.Incidencias {
-		if inc.Estado != 2 { // solo las que aún no están terminadas
+		if inc.Estado != 2 {
 			total += inc.TiempoAcumulado
 		}
 	}
 	v.TiempoTotal = total
+
+	if v.TiempoTotal > 15 {
+		v.Prioritario = true
+	}
 }
 
 func (t *Taller) updateMecanico(id int, nombre, especialidad string, a int, activo bool) error {
@@ -410,14 +424,14 @@ func (t *Taller) showVehiculosCliente(id int) {
 }
 
 func printVehiculo(v *Vehiculo) {
-	fmt.Printf("Vehículo %s: %s %s (Tiempo estimado en reparar incidencias %d)\n", v.Matricula, v.Marca, v.Modelo, v.TiempoTotal)
+	fmt.Printf("Vehículo %s: %s %s (Tiempo estimado en reparar incidencias %d s)\n", v.Matricula, v.Marca, v.Modelo, v.TiempoTotal)
 	if len(v.Incidencias) == 0 {
 		fmt.Println("  Sin incidencias registradas")
 		return
 	}
 	fmt.Println("  Incidencias:")
 	for _, inc := range v.Incidencias {
-		fmt.Printf("   - [%s] %s (%s) tiempo estimado de reparación %d\n", estadoToString(inc.Estado), inc.Tipo, inc.Prioridad, inc.TiempoAcumulado)
+		fmt.Printf("   - [%s] %s (%s) tiempo estimado de reparación %d s\n", estadoToString(inc.Estado), inc.Tipo, inc.Prioridad, inc.TiempoAcumulado)
 	}
 }
 
@@ -688,17 +702,6 @@ func (t *Taller) admitirCliente(clienteID int, v *Vehiculo, mecanicoID int) erro
 
 	return nil
 }
-
-/*
-func (t *Taller) showTiemposTotales() {
-	fmt.Println("\n--- TIEMPOS TOTALES POR VEHÍCULO ---")
-	for _, v := range t.Vehiculos {
-		t.updateTiempoTotalVehiculo(v)
-		fmt.Printf("Vehículo %s: %ds acumulados (%d incidencias)\n",
-			v.Matricula, v.TiempoTotal, len(v.Incidencias))
-	}
-}
-*/
 
 // ---------- SUBMENÚS DE LAS ESTRUCTURAS ----------
 
