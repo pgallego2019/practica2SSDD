@@ -19,9 +19,9 @@ paula@840g3:~/SSDD/practica2SSDD$ go test -v
 ### Estructuras de datos
 El sistema mantiene las estructuras principales de la práctica anterior, con algunas modificaciones para incluir control de tiempo y concurrencia:
 
-- Taller: estructura principal que agrupa listas de clientes, vehículos, mecánicos, incidencias y plazas de trabajo. No tiene modificaciones respecto a la práctica anterior.
+- Taller: estructura principal que agrupa listas de clientes, vehículos, mecánicos, incidencias y plazas de trabajo. Ahora hay un campo MAX_PLAZAS que indica el tamaño máximo del taller.
 
-- Mecánico: contiene ID, nombre, especialidad (mecanica, electrica o carroceria), años de experiencia y estado activo (si está trabajando o no).
+- Mecánico: contiene ID, nombre, especialidad (mecanica, electrica o carroceria), años de experiencia y estado activo (si está trabajando o no). Cada mecánico crea dos plazas en el taller, se muestran mensajes cuando se han alcanzado las plazas máximas.
 
 - Vehículo: incluye información básica y una lista de incidencias asociadas. Ahora también incluye un campo tiempoAcumulado que se corresponde con el tiempoAcumulado de sus incidencias y un campo Prioritario para marcarlo cuando se trabaja en él.
 
@@ -74,7 +74,7 @@ Esta función actúa como mecanismo de decisión y equilibrio de carga dentro de
 
 3. _**trabajoMecanico(m *Mecanico, chTrabajos, chResultados, t)**_: Cada mecánico ejecuta esta goroutine de forma independiente. Lee trabajos del canal chTrabajos, revisa si la incidencia está cerrada (para saltar ese trabajo), revisa si el mecánico puede trabajar en esa incidencia  (_verificarAsignacionMecanico_) y si puede trabajar, simula la reparación con time.Sleep según su especialidad y acumula el tiempo en la incidencia y en el vehículo. Si una incidencia supera los 15 segundos acumulados, se le da prioridad. Para esto se intenta buscar un nuevo mecánico libre, pero si no hay se contrata un nuevo mecánico automáticamente y el trabajo se reenvía a la cola de espera.
 
-4. _**generadorVehículos(t, chTrabajos)**_: Genera de forma periódica vehículos nuevos (cada 2 segundos) con distintos tipos de incidencia (mecánica, eléctrica, carrocería) y los envía al canal de trabajos.
+4. _**generadorVehículos(t, chTrabajos, numVehiculos)**_: Genera de forma periódica vehículos nuevos (cada 2 segundos) con distintos tipos de incidencia (mecánica, eléctrica, carrocería) y los envía al canal de trabajos. Se pide al usuario un número de vehículos a generar, si es inválido el número por defecto es 5.
 
 5. _**imprimirResultados(chResultados)**_: Goroutine dedicada a mostrar en pantalla los mensajes que van llegando sobre eventos del sistema: inicio y fin de trabajos, reasignaciones, contrataciones, etc.
 
