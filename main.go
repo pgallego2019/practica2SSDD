@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const MAX_PLAZAS = 8 // número máximo total de plazas en el taller
+
 // ------------ TIPOS ENUMERADOS ------------
 
 type Especialidad string
@@ -163,7 +165,19 @@ func (t *Taller) newMecanico(n string, e string, a int) *Mecanico {
 	t.nextMecanicoID++
 	t.Mecanicos = append(t.Mecanicos, m)
 
-	for i := 0; i < 2; i++ {
+	// Control del máximo de plazas
+	plazasDisponibles := MAX_PLAZAS - len(t.Plazas)
+	if plazasDisponibles <= 0 {
+		fmt.Printf("No se pueden crear nuevas plazas: límite máximo (%d) alcanzado\n", MAX_PLAZAS)
+		return m
+	}
+
+	plazasACrear := 2
+	if plazasACrear > plazasDisponibles {
+		plazasACrear = plazasDisponibles
+	}
+
+	for i := 0; i < plazasACrear; i++ {
 		plazaID := len(t.Plazas) + 1
 		p := &Plaza{
 			ID:         plazaID,
@@ -172,6 +186,10 @@ func (t *Taller) newMecanico(n string, e string, a int) *Mecanico {
 		}
 		t.Plazas = append(t.Plazas, p)
 	}
+
+	fmt.Printf("Mecánico %s creado (%s) — se añaden %d plazas (total: %d/%d)\n",
+		m.Nombre, e, plazasACrear, len(t.Plazas), MAX_PLAZAS)
+
 	return m
 }
 
@@ -574,6 +592,41 @@ func printPlaza(p *Plaza) {
 	if p.Ocupada {
 		fmt.Printf("Vehículo matricula: %s\n", p.VehiculoMat)
 		fmt.Printf("Mecánico asignado (ID): %d\n", p.MecanicoID)
+	}
+}
+
+func (t *Taller) plazasOcupadas() []*Plaza {
+	var ocupadas []*Plaza
+	for _, p := range t.Plazas {
+		if p.Ocupada {
+			ocupadas = append(ocupadas, p)
+		}
+	}
+	return ocupadas
+}
+
+// Verifica si un vehículo ha terminado todas sus incidencias y libera su plaza si corresponde
+func (t *Taller) liberarPlaza(v *Vehiculo) {
+	reparado := true
+	for _, inc := range v.Incidencias {
+		if inc.Estado != 2 {
+			reparado = false
+			break
+		}
+	}
+
+	if !reparado {
+		return
+	}
+
+	for _, p := range t.Plazas {
+		if p.VehiculoMat == v.Matricula {
+			p.Ocupada = false
+			p.VehiculoMat = ""
+			fmt.Printf("Vehículo %s finalizó todas las incidencias. Plaza %d liberada (%d/%d ocupadas)\n",
+				v.Matricula, p.ID, len(t.plazasOcupadas()), len(t.Plazas))
+			break
+		}
 	}
 }
 
