@@ -97,6 +97,7 @@ func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan str
 			chResultados <- fmt.Sprintf(
 				"Mecánico %s terminó incidencia del vehículo %s (%s) en %ds.\nEl vehículo %s está reparado",
 				m.Nombre, v.Matricula, inc.Tipo, duracion, v.Matricula)
+			t.liberarPlaza(v)
 		} else {
 			chResultados <- fmt.Sprintf(
 				"Mecánico %s terminó incidencia del vehículo %s (%s) en %ds [Tiempo restante del vehículo %ds]",
@@ -106,10 +107,10 @@ func trabajoMecanico(m *Mecanico, chTrabajos chan Trabajo, chResultados chan str
 }
 
 // Goroutine generadora de vehículos e incidencias para alimentar el canal de trabajos
-func generadorVehículos(t *Taller, chTrabajos chan Trabajo) {
+func generadorVehículos(t *Taller, chTrabajos chan Trabajo, nvehiculos int) {
 	tipos := []Especialidad{Mecanica, Electrica, Carroceria}
 
-	for i := 1; i <= 4; i++ {
+	for i := 1; i <= nvehiculos; i++ {
 		v := t.newVehiculo(
 			fmt.Sprintf("M-%03d", i),
 			"Fiat",
@@ -118,6 +119,27 @@ func generadorVehículos(t *Taller, chTrabajos chan Trabajo) {
 			"",
 			nil,
 		)
+
+		// Buscar plaza libre
+		plazaLibre := -1
+		for i, p := range t.Plazas {
+			if !p.Ocupada {
+				plazaLibre = i
+				break
+			}
+		}
+
+		if plazaLibre == -1 {
+			fmt.Printf("Vehículo %s rechazado: no hay plazas disponibles (%d/%d)\n",
+				v.Matricula, len(t.plazasOcupadas()), len(t.Plazas))
+			continue
+		}
+
+		// Ocupar la plaza
+		t.Plazas[plazaLibre].Ocupada = true
+		t.Plazas[plazaLibre].VehiculoMat = v.Matricula
+		fmt.Printf("Vehículo %s ocupa plaza %d (%d/%d ocupadas)\n",
+			v.Matricula, t.Plazas[plazaLibre].ID, len(t.plazasOcupadas()), len(t.Plazas))
 
 		// Cada vehículo tendrá entre 1 y 3 incidencias
 		numInc := rand.Intn(3) + 1
@@ -166,6 +188,14 @@ func imprimirResultados(chResultados chan string) {
 func simularTaller(t *Taller) {
 	fmt.Println("\n=== SIMULACIÓN CONCURRENTE DEL TALLER ===")
 
+	var numVehiculos int
+	fmt.Print("Introduce el número de vehículos a generar: ")
+	_, err := fmt.Scan(&numVehiculos)
+	if err != nil || numVehiculos <= 0 {
+		numVehiculos = 5 // valor por defecto
+		fmt.Println("Entrada inválida, se generarán 5 vehículos por defecto.")
+	}
+
 	chTrabajos := make(chan Trabajo, 20)
 	chResultados := make(chan string, 50)
 
@@ -185,7 +215,7 @@ func simularTaller(t *Taller) {
 	}
 
 	go func() {
-		generadorVehículos(t, chTrabajos)
+		generadorVehículos(t, chTrabajos, numVehiculos)
 		//close(chTrabajos)
 	}()
 
