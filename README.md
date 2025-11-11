@@ -163,7 +163,7 @@ Las métricas registradas son:
 - Plantilla: 1 mecánico por especialidad.
 Resultados:
 
-´´´
+```
 === RUN   TestSimulacionDuplicarIncidencias
 === Resultados de la simulación ===
 -> Mecmecanica terminó carroceria de vehículo V-01
@@ -179,7 +179,7 @@ Incidencias por mecánico:
   Mecmecanica: 7
   Mecelectrica: 1
 --- PASS: TestSimulacionDuplicarIncidencias (0.00s)
-´´
+```
 
 Al duplicar el número de incidencias, los mecánicos existentes pudieron atender todas las incidencias, pero algunos mecánicos alcanzaron más carga de trabajo, lo que podría afectar el tiempo total de atención en un escenario real con duraciones simuladas.
 
@@ -188,7 +188,7 @@ Al duplicar el número de incidencias, los mecánicos existentes pudieron atende
 - Plantilla: 2 mecánicos por especialidad (6 en total).
 Resultados:
 
-´´´
+```
 === RUN   TestSimulacionDuplicarMecanicos
 === Resultados de la simulación ===
 -> Mecmecanica terminó carroceria de vehículo V-01
@@ -200,7 +200,7 @@ Incidencias por mecánico:
   Mecmecanica: 3
   Mecelectrica: 1
 --- PASS: TestSimulacionDuplicarMecanicos (0.00s)
-´´´
+```
 
 La duplicación de la plantilla permite repartir mejor la carga, aunque en este escenario con pocas incidencias algunos mecánicos no llegan a atender ninguna incidencia
 
