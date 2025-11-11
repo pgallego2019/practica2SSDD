@@ -104,6 +104,8 @@ Mientras el diagrama de secuencia muestra las interacciones entre procesos concu
 
 ![diagrama de flujo](https://github.com/pgallego2019/practica2SSDD/blob/main/diagramas/diagramaspractica2ssdd-Diagrama%20de%20flujo.drawio.png)
 
+![diagrama de flujo de trabajoMecanico()](https://github.com/pgallego2019/practica2SSDD/blob/main/diagramas/diagramaspractica2ssdd-Diagrama%20flujo%20trabajoMecanico().drawio.png)
+
 Este diagrama refleja el ciclo completo del sistema:
 
 1. Inicialización de datos y creación de mecánicos.
